@@ -21,7 +21,7 @@ class Program
         // Step 3: Filter results and include only rows where AccountId matches
         DataTable filteredResults = new DataTable();
         filteredResults.Columns.Add("AccountId", typeof(int)); // Add AccountId column
-        filteredResults.Columns.Add("Message", typeof(string)); // Add renamed column 'Message' (formerly 'MismatchReason')
+        filteredResults.Columns.Add("Message", typeof(string)); // Add renamed column 'Message'
 
         foreach (DataRow row in spResults.Rows)
         {
