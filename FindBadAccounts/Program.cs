@@ -23,14 +23,20 @@ class Program
         filteredResults.Columns.Add("AccountId", typeof(int)); // Add AccountId column
         filteredResults.Columns.Add("Message", typeof(string)); // Add renamed column 'Message'
 
-        foreach (DataRow row in spResults.Rows)
+        // Create a lookup dictionary from spResults for fast ID lookup
+        var spResultsLookup = spResults.AsEnumerable()
+            .Where(row => row["AccountId"] != DBNull.Value)
+            .ToDictionary(row => (int)row["AccountId"], row => row["MismatchReason"]?.ToString());
+
+        // Iterate through matchingIds (smaller collection)
+        foreach (int id in matchingIds)
         {
-            if (row["AccountId"] != DBNull.Value && matchingIds.Contains((int)row["AccountId"]))
+            if (spResultsLookup.TryGetValue(id, out string message))
             {
-                // Create a new row for the filtered results containing only AccountId and Message
+                // Create a new row for the filtered results
                 DataRow newRow = filteredResults.NewRow();
-                newRow["AccountId"] = row["AccountId"];
-                newRow["Message"] = row["MismatchReason"]; // Copy MismatchReason to Message column
+                newRow["AccountId"] = id;
+                newRow["Message"] = message;
                 filteredResults.Rows.Add(newRow);
             }
         }
