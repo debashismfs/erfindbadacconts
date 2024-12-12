@@ -184,47 +184,42 @@ class Program
             int smtpPort = mailSettings.SmtpPort; // Default port for STARTTLS
             string fromEmail = mailSettings.FromEmail;
             string emailPassword = mailSettings.EmailPassword;
-            string body = "";
-            string content = "";
+            string content = HasData ? "Please find attached ER bad accounts." : "No bad account found.";
 
-            content = HasData ? "Please find attached ER bad accounts." : "No bad account found.";
+            string body = $"<!DOCTYPE html><html><head><style>body{{font-family:Arial,sans-serif;font-size:14px;color:#333333;line-height:1.6;}}.email-container{{margin:0;padding:10px;border:1px solid #dddddd;border-radius:5px;background-color:#f9f9f9;}}.header{{font-weight:bold;margin-bottom:10px;}}.content{{margin-bottom:10px;}}</style></head><body><div class='email-container'><div class='header'>Hi,</div><div class='content'>{content}</div></div></body></html>";
 
-            body = $"<!DOCTYPE html><html><head><style>body{{font-family:Arial,sans-serif;font-size:14px;color:#333333;line-height:1.6;}}.email-container{{margin:0;padding:10px;border:1px solid #dddddd;border-radius:5px;background-color:#f9f9f9;}}.header{{font-weight:bold;margin-bottom:10px;}}.content{{margin-bottom:10px;}}</style></head><body><div class='email-container'><div class='header'>Hi,</div><div class='content'>{content}</div></div></body></html>";
-
-
-            // Create a MailMessage object
-            MailMessage mail = new MailMessage
+            using (MailMessage mail = new MailMessage())
             {
-                From = new MailAddress(fromEmail),
-                Subject = "ER Bad Account",
-                Body = body,
-                IsBodyHtml = true // Set to true if the email body contains HTML
-            };
+                mail.From = new MailAddress(fromEmail);
+                mail.Subject = "ER Bad Account";
+                mail.Body = body;
+                mail.IsBodyHtml = true; // Set to true if the email body contains HTML
 
-            // Add recipient
-            mail.To.Add(mailSettings.ToEmail);
+                // Add recipient
+                mail.To.Add(mailSettings.ToEmail);
 
-            // Add attachment if a file path is provided
-            if (!string.IsNullOrEmpty(attachmentFilePath) && File.Exists(attachmentFilePath))
-            {
-                Attachment attachment = new Attachment(attachmentFilePath);
-                mail.Attachments.Add(attachment);
+                // Add attachment if a file path is provided
+                if (!string.IsNullOrEmpty(attachmentFilePath) && File.Exists(attachmentFilePath))
+                {
+                    Attachment attachment = new Attachment(attachmentFilePath);
+                    mail.Attachments.Add(attachment);
+                }
+                else if (!string.IsNullOrEmpty(attachmentFilePath))
+                {
+                    Console.WriteLine("Attachment file not found. Skipping attachment.");
+                }
+
+                // Configure the SMTP client
+                using (SmtpClient smtpClient = new SmtpClient(smtpServer, smtpPort))
+                {
+                    smtpClient.Credentials = new NetworkCredential(fromEmail, emailPassword);
+                    smtpClient.EnableSsl = true; // STARTTLS requires SSL
+
+                    // Send the email
+                    smtpClient.Send(mail);
+                    Console.WriteLine("Email sent successfully!");
+                }
             }
-            else if (!string.IsNullOrEmpty(attachmentFilePath))
-            {
-                Console.WriteLine("Attachment file not found. Skipping attachment.");
-            }
-
-            // Configure the SMTP client
-            SmtpClient smtpClient = new SmtpClient(smtpServer, smtpPort)
-            {
-                Credentials = new NetworkCredential(fromEmail, emailPassword),
-                EnableSsl = true // STARTTLS requires SSL
-            };
-
-            // Send the email
-            smtpClient.Send(mail);
-            Console.WriteLine("Email sent successfully!");
         }
         catch (Exception ex)
         {
