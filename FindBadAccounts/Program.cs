@@ -26,35 +26,33 @@ class Program
         string downloadsPath = Path.Combine(GetFolderPath(SpecialFolder.UserProfile), "Downloads");
         string filePath = Path.Combine(downloadsPath, "output.xlsx");
 
+        //CorrectStatus(matchingIds, connectionString, storedProcedureName2);
+
         // Step 1: Get the matching IDs from the query and update account status if incorrect
-        var matchingIds = GetMatchingIds(connectionString, TrxDay);
-        CorrectStatus(matchingIds, connectionString, storedProcedureName2);
+        //var matchingIds = GetMatchingIds(connectionString, TrxDay);
 
         // Step 2: Get stored procedure results
         DataTable spResults = GetStoredProcedureResults(connectionString, storedProcedureName1);
 
         // Step 3: Filter results and include only rows where AccountId matches
+        // Assuming spResults is the DataTable from the stored procedure
+        // Step 3: Filter results and include only rows where AccountId matches
         DataTable filteredResults = new DataTable();
         filteredResults.Columns.Add("AccountId", typeof(int)); // Add AccountId column
         filteredResults.Columns.Add("Message", typeof(string)); // Add renamed column 'Message'
 
-        // Create a lookup dictionary from spResults for fast ID lookup
-        var spResultsLookup = spResults.AsEnumerable()
-            .Where(row => row["AccountId"] != DBNull.Value)
-            .ToDictionary(row => (int)row["AccountId"], row => row["MismatchReason"]?.ToString());
-
-        // Iterate through matchingIds (smaller collection)
-        foreach (int id in matchingIds)
+        // Loop through each row in spResults
+        foreach (DataRow row in spResults.Rows)
         {
-            if (spResultsLookup.TryGetValue(id, out string message))
-            {
-                // Create a new row for the filtered results
-                DataRow newRow = filteredResults.NewRow();
-                newRow["AccountId"] = id;
-                newRow["Message"] = message;
-                filteredResults.Rows.Add(newRow);
-            }
+            // Extract the AccountId and Message values
+            DataRow newRow = filteredResults.NewRow();
+            newRow["AccountId"] = Convert.ToInt32(row["AccountId"]);
+            newRow["Message"] = row["MismatchReason"]?.ToString();
+            filteredResults.Rows.Add(newRow);
         }
+
+        CorrectStatus(filteredResults, connectionString, storedProcedureName2);
+
 
         // Step 4: Check if there are any rows to export
         if (filteredResults.Rows.Count > 0)
@@ -110,6 +108,7 @@ class Program
             // Add parameters to the command
             command.Parameters.AddWithValue("@clientCustomerAccountId", 0);
             command.Parameters.AddWithValue("@checkForStatusIssue", 0);
+            command.Parameters.AddWithValue("@transactionyear", 0);
 
             SqlDataAdapter adapter = new SqlDataAdapter(command);
             adapter.Fill(dataTable);
@@ -147,18 +146,18 @@ class Program
         workbook.SaveAs(filePath);
     }
 
-    static void CorrectStatus(HashSet<int> Ids, string connectionString, string storedProcedureName)
+    static void CorrectStatus(DataTable Ids, string connectionString, string storedProcedureName)
     {
         using (SqlConnection connection = new SqlConnection(connectionString))
         {
             connection.Open(); // Open the connection once to optimize performance
 
-            foreach (int id in Ids)
+            foreach (DataRow row in Ids.Rows)
             {
                 using (SqlCommand command = new SqlCommand(storedProcedureName, connection))
                 {
                     command.CommandType = CommandType.StoredProcedure;
-                    command.Parameters.AddWithValue("@ClientCustomerAccountID", id);
+                    command.Parameters.AddWithValue("@ClientCustomerAccountID", row["AccountId"]);
 
                     try
                     {
@@ -167,7 +166,7 @@ class Program
                     catch (Exception ex)
                     {
                         // Log or handle the exception as needed, or suppress if required
-                        Console.WriteLine($"Error executing stored procedure \"{storedProcedureName}\" for ID {id}: {ex.Message}");
+                        Console.WriteLine($"Error executing stored procedure \"{storedProcedureName}\" for ID {row["AccountId"]}: {ex.Message}");
                     }
                 }
             }
