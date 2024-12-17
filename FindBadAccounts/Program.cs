@@ -32,7 +32,7 @@ class Program
         //var matchingIds = GetMatchingIds(connectionString, TrxDay);
 
         // Step 2: Get stored procedure results
-        DataTable spResults = GetStoredProcedureResults(connectionString, storedProcedureName1);
+        DataTable spResults = GetStoredProcedureResults(connectionString, storedProcedureName1, TrxDay);
 
         // Step 3: Filter results and include only rows where AccountId matches
         // Assuming spResults is the DataTable from the stored procedure
@@ -67,7 +67,7 @@ class Program
             SendEmail(false, mailSettings);
             Console.WriteLine("No data to export.");
         }
-        Console.ReadLine();
+        //Console.ReadLine();
     }
 
     // Step 1: Get the matching AccountIds based on the query
@@ -93,7 +93,7 @@ class Program
     }
 
     // Step 2: Get results from stored procedure
-    static DataTable GetStoredProcedureResults(string connectionString, string storedProcedureName)
+    static DataTable GetStoredProcedureResults(string connectionString, string storedProcedureName, int TrxDay)
     {
         DataTable dataTable = new DataTable();
 
@@ -109,6 +109,7 @@ class Program
             command.Parameters.AddWithValue("@clientCustomerAccountId", 0);
             command.Parameters.AddWithValue("@checkForStatusIssue", 0);
             command.Parameters.AddWithValue("@transactionyear", 0);
+            command.Parameters.AddWithValue("@trxday", TrxDay);
 
             SqlDataAdapter adapter = new SqlDataAdapter(command);
             adapter.Fill(dataTable);
