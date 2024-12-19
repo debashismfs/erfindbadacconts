@@ -5,6 +5,7 @@ using ClosedXML.Excel;
 using System.Net.Mail;
 using System.Net;
 using Microsoft.Extensions.Configuration;
+using System.Globalization;
 
 class Program
 {
@@ -59,12 +60,12 @@ class Program
         {
             // Step 5: Export the filtered results to Excel
             ExportToExcel(filteredResults, filePath);
-            SendEmail(true, mailSettings, filePath);
+            SendEmail(true, mailSettings, TrxDay, filePath);
             File.Delete(filePath);
         }
         else
         {
-            SendEmail(false, mailSettings);
+            SendEmail(false, mailSettings, TrxDay);
             Console.WriteLine("No data to export.");
         }
         //Console.ReadLine();
@@ -175,7 +176,7 @@ class Program
     }
 
 
-    static void SendEmail(bool HasData, MailSettings mailSettings, string attachmentFilePath = null)
+    static void SendEmail(bool HasData, MailSettings mailSettings, int TrxDay, string attachmentFilePath = null)
     {
         try
         {
@@ -191,7 +192,7 @@ class Program
             using (MailMessage mail = new MailMessage())
             {
                 mail.From = new MailAddress(fromEmail);
-                mail.Subject = "ER Bad Account";
+                mail.Subject = $"ER Bad Account : {DateTime.Now.AddDays(-1*TrxDay).Date.ToString("dd-MM-yyyy", new CultureInfo("hi-IN"))}";
                 mail.Body = body;
                 mail.IsBodyHtml = true; // Set to true if the email body contains HTML
 
