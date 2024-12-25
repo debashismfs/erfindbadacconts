@@ -11,62 +11,69 @@ class Program
 {
     static void Main()
     {
-        // Load configuration
-        IConfiguration config = new ConfigurationBuilder()
-            .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
-
-        // Fetch configuration values
-        string connectionString = config.GetConnectionString("DefaultConnection");
-        string storedProcedureName1 = config["StoredProcedures:FindBadAccounts"];
-        string storedProcedureName2 = config["StoredProcedures:FixZeroBalanceAccountStatus"];
-        var mailSettings = config.GetSection("EmailSettings").Get<MailSettings>();
-        int TrxDay = Convert.ToInt32(config["TransactionDay"]);
-
-        string downloadsPath = Path.Combine(GetFolderPath(SpecialFolder.UserProfile), "Downloads");
-        string filePath = Path.Combine(downloadsPath, "output.xlsx");
-
-        //CorrectStatus(matchingIds, connectionString, storedProcedureName2);
-
-        // Step 1: Get the matching IDs from the query and update account status if incorrect
-        //var matchingIds = GetMatchingIds(connectionString, TrxDay);
-
-        // Step 2: Get stored procedure results
-        DataTable spResults = GetStoredProcedureResults(connectionString, storedProcedureName1, TrxDay);
-
-        // Step 3: Filter results and include only rows where AccountId matches
-        // Assuming spResults is the DataTable from the stored procedure
-        // Step 3: Filter results and include only rows where AccountId matches
-        DataTable filteredResults = new DataTable();
-        filteredResults.Columns.Add("AccountId", typeof(int)); // Add AccountId column
-        filteredResults.Columns.Add("Message", typeof(string)); // Add renamed column 'Message'
-
-        // Loop through each row in spResults
-        foreach (DataRow row in spResults.Rows)
+        try
         {
-            // Extract the AccountId and Message values
-            DataRow newRow = filteredResults.NewRow();
-            newRow["AccountId"] = Convert.ToInt32(row["AccountId"]);
-            newRow["Message"] = row["MismatchReason"]?.ToString();
-            filteredResults.Rows.Add(newRow);
+            // Load configuration
+            IConfiguration config = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
+
+            // Fetch configuration values
+            string connectionString = config.GetConnectionString("DefaultConnection");
+            string storedProcedureName1 = config["StoredProcedures:FindBadAccounts"];
+            string storedProcedureName2 = config["StoredProcedures:FixZeroBalanceAccountStatus"];
+            var mailSettings = config.GetSection("EmailSettings").Get<MailSettings>();
+            int TrxDay = Convert.ToInt32(config["TransactionDay"]);
+
+            string downloadsPath = Path.Combine(GetFolderPath(SpecialFolder.UserProfile), "Downloads");
+            string filePath = Path.Combine(downloadsPath, "output.xlsx");
+
+            //CorrectStatus(matchingIds, connectionString, storedProcedureName2);
+
+            // Step 1: Get the matching IDs from the query and update account status if incorrect
+            //var matchingIds = GetMatchingIds(connectionString, TrxDay);
+
+            // Step 2: Get stored procedure results
+            DataTable spResults = GetStoredProcedureResults(connectionString, storedProcedureName1, TrxDay);
+
+            // Step 3: Filter results and include only rows where AccountId matches
+            // Assuming spResults is the DataTable from the stored procedure
+            // Step 3: Filter results and include only rows where AccountId matches
+            DataTable filteredResults = new DataTable();
+            filteredResults.Columns.Add("AccountId", typeof(int)); // Add AccountId column
+            filteredResults.Columns.Add("Message", typeof(string)); // Add renamed column 'Message'
+
+            // Loop through each row in spResults
+            foreach (DataRow row in spResults.Rows)
+            {
+                // Extract the AccountId and Message values
+                DataRow newRow = filteredResults.NewRow();
+                newRow["AccountId"] = Convert.ToInt32(row["AccountId"]);
+                newRow["Message"] = row["MismatchReason"]?.ToString();
+                filteredResults.Rows.Add(newRow);
+            }
+
+            CorrectStatus(filteredResults, connectionString, storedProcedureName2);
+
+
+            // Step 4: Check if there are any rows to export
+            if (filteredResults.Rows.Count > 0)
+            {
+                // Step 5: Export the filtered results to Excel
+                ExportToExcel(filteredResults, filePath);
+                SendEmail(true, mailSettings, TrxDay, filePath);
+                File.Delete(filePath);
+            }
+            else
+            {
+                SendEmail(false, mailSettings, TrxDay);
+                Console.WriteLine("No data to export.");
+            }
         }
-
-        CorrectStatus(filteredResults, connectionString, storedProcedureName2);
-
-
-        // Step 4: Check if there are any rows to export
-        if (filteredResults.Rows.Count > 0)
+        catch (Exception ex)
         {
-            // Step 5: Export the filtered results to Excel
-            ExportToExcel(filteredResults, filePath);
-            SendEmail(true, mailSettings, TrxDay, filePath);
-            File.Delete(filePath);
-        }
-        else
-        {
-            SendEmail(false, mailSettings, TrxDay);
-            Console.WriteLine("No data to export.");
+            Console.WriteLine("Error: " + ex.Message);
         }
         //Console.ReadLine();
     }
