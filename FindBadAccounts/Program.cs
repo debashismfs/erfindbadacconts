@@ -53,8 +53,10 @@ class Program
                 newRow["Message"] = row["MismatchReason"]?.ToString();
                 filteredResults.Rows.Add(newRow);
             }
-
-            CorrectStatus(filteredResults, connectionString, storedProcedureName2);
+            if (filteredResults.Rows.Count > 0)
+            {
+                CorrectStatus(filteredResults, connectionString, storedProcedureName2);
+            }
 
 
             // Step 4: Check if there are any rows to export
