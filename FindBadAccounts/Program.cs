@@ -201,7 +201,11 @@ class Program
             using (MailMessage mail = new MailMessage())
             {
                 mail.From = new MailAddress(fromEmail);
-                mail.Subject = $"ER Bad Account : {DateTime.Now.AddDays(-1*TrxDay).Date.ToString("dd-MM-yyyy", new CultureInfo("hi-IN"))}";
+
+                TimeZoneInfo estZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+                DateTime estTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, estZone);
+                mail.Subject = $"ER Bad Account : {estTime.AddDays(-1 * TrxDay).Date.ToString("dd-MM-yyyy", new CultureInfo("hi-IN"))}";
+
                 mail.Body = body;
                 mail.IsBodyHtml = true; // Set to true if the email body contains HTML
 
