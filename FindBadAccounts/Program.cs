@@ -9,7 +9,7 @@ using System.Globalization;
 
 class Program
 {
-    static void Main()
+    static async Task Main()
     {
         try
         {
@@ -29,16 +29,9 @@ class Program
             string downloadsPath = Path.Combine(GetFolderPath(SpecialFolder.UserProfile), "Downloads");
             string filePath = Path.Combine(downloadsPath, "output.xlsx");
 
-            //CorrectStatus(matchingIds, connectionString, storedProcedureName2);
-
-            // Step 1: Get the matching IDs from the query and update account status if incorrect
-            //var matchingIds = GetMatchingIds(connectionString, TrxDay);
-
             // Step 2: Get stored procedure results
-            DataTable spResults = GetStoredProcedureResults(connectionString, storedProcedureName1, TrxDay);
+            DataTable spResults = await GetStoredProcedureResultsAsync(connectionString, storedProcedureName1, TrxDay);
 
-            // Step 3: Filter results and include only rows where AccountId matches
-            // Assuming spResults is the DataTable from the stored procedure
             // Step 3: Filter results and include only rows where AccountId matches
             DataTable filteredResults = new DataTable();
             filteredResults.Columns.Add("AccountId", typeof(int)); // Add AccountId column
@@ -53,23 +46,23 @@ class Program
                 newRow["Message"] = row["MismatchReason"]?.ToString();
                 filteredResults.Rows.Add(newRow);
             }
+
             if (filteredResults.Rows.Count > 0)
             {
-                CorrectStatus(filteredResults, connectionString, storedProcedureName2);
+                await CorrectStatusAsync(filteredResults, connectionString, storedProcedureName2);
             }
-
 
             // Step 4: Check if there are any rows to export
             if (filteredResults.Rows.Count > 0)
             {
                 // Step 5: Export the filtered results to Excel
-                ExportToExcel(filteredResults, filePath);
-                SendEmail(true, mailSettings, TrxDay, filePath);
+                await ExportToExcelAsync(filteredResults, filePath);
+                await SendEmailAsync(true, mailSettings, TrxDay, filePath);
                 File.Delete(filePath);
             }
             else
             {
-                SendEmail(false, mailSettings, TrxDay);
+                await SendEmailAsync(false, mailSettings, TrxDay);
                 Console.WriteLine("No data to export.");
             }
         }
@@ -77,33 +70,41 @@ class Program
         {
             Console.WriteLine("Error: " + ex.Message);
         }
-        //Console.ReadLine();
     }
 
-    // Step 1: Get the matching AccountIds based on the query
-    static HashSet<int> GetMatchingIds(string connectionString, int TrxDay)
+    // Step 4: Export the filtered DataTable to Excel
+    static async Task ExportToExcelAsync(DataTable dataTable, string filePath)
     {
-        string query = $"SELECT distinct ClientCustomerAccountID from ARTrx where TrxTypeID<>1 and cast(CreatedOn as date)=cast(getdate()-{TrxDay} as date)";
-
-        HashSet<int> ids = new HashSet<int>();
-
-        using (SqlConnection connection = new SqlConnection(connectionString))
-        using (SqlCommand command = new SqlCommand(query, connection))
+        await Task.Run(() =>
         {
-            connection.Open();
-            using (SqlDataReader reader = command.ExecuteReader())
+            using XLWorkbook workbook = new XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("Sheet1");
+
+            // Add DataTable headers
+            for (int col = 0; col < dataTable.Columns.Count; col++)
             {
-                while (reader.Read())
+                worksheet.Cell(1, col + 1).Value = dataTable.Columns[col].ColumnName;
+            }
+
+            // Add DataTable rows
+            for (int row = 0; row < dataTable.Rows.Count; row++)
+            {
+                for (int col = 0; col < dataTable.Columns.Count; col++)
                 {
-                    ids.Add(reader.GetInt32(0)); // Assuming 'id' is an integer
+                    worksheet.Cell(row + 2, col + 1).Value = dataTable.Rows[row][col]?.ToString();
                 }
             }
-        }
-        return ids;
+
+            // Auto-fit columns for better readability
+            worksheet.Columns().AdjustToContents();
+
+            // Save the file
+            workbook.SaveAs(filePath);
+        });
     }
 
-    // Step 2: Get results from stored procedure
-    static DataTable GetStoredProcedureResults(string connectionString, string storedProcedureName, int TrxDay)
+
+    static async Task<DataTable> GetStoredProcedureResultsAsync(string connectionString, string storedProcedureName, int TrxDay)
     {
         DataTable dataTable = new DataTable();
 
@@ -122,70 +123,36 @@ class Program
             command.Parameters.AddWithValue("@trxday", TrxDay);
 
             SqlDataAdapter adapter = new SqlDataAdapter(command);
-            adapter.Fill(dataTable);
+            await Task.Run(() => adapter.Fill(dataTable));
         }
 
         return dataTable;
     }
 
-
-    // Step 4: Export the filtered DataTable to Excel
-    static void ExportToExcel(DataTable dataTable, string filePath)
+    static async Task CorrectStatusAsync(DataTable Ids, string connectionString, string storedProcedureName)
     {
-        using XLWorkbook workbook = new XLWorkbook();
-        var worksheet = workbook.Worksheets.Add("Sheet1");
+        using SqlConnection connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(); // Open the connection once to optimize performance
 
-        // Add DataTable headers
-        for (int col = 0; col < dataTable.Columns.Count; col++)
+        foreach (DataRow row in Ids.Rows)
         {
-            worksheet.Cell(1, col + 1).Value = dataTable.Columns[col].ColumnName;
-        }
+            using SqlCommand command = new SqlCommand(storedProcedureName, connection);
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@ClientCustomerAccountID", row["AccountId"]);
 
-        // Add DataTable rows
-        for (int row = 0; row < dataTable.Rows.Count; row++)
-        {
-            for (int col = 0; col < dataTable.Columns.Count; col++)
+            try
             {
-                worksheet.Cell(row + 2, col + 1).Value = dataTable.Rows[row][col]?.ToString();
+                await command.ExecuteNonQueryAsync();
             }
-        }
-
-        // Auto-fit columns for better readability
-        worksheet.Columns().AdjustToContents();
-
-        // Save the file
-        workbook.SaveAs(filePath);
-    }
-
-    static void CorrectStatus(DataTable Ids, string connectionString, string storedProcedureName)
-    {
-        using (SqlConnection connection = new SqlConnection(connectionString))
-        {
-            connection.Open(); // Open the connection once to optimize performance
-
-            foreach (DataRow row in Ids.Rows)
+            catch (Exception ex)
             {
-                using (SqlCommand command = new SqlCommand(storedProcedureName, connection))
-                {
-                    command.CommandType = CommandType.StoredProcedure;
-                    command.Parameters.AddWithValue("@ClientCustomerAccountID", row["AccountId"]);
-
-                    try
-                    {
-                        command.ExecuteNonQuery();
-                    }
-                    catch (Exception ex)
-                    {
-                        // Log or handle the exception as needed, or suppress if required
-                        Console.WriteLine($"Error executing stored procedure \"{storedProcedureName}\" for ID {row["AccountId"]}: {ex.Message}");
-                    }
-                }
+                // Log or handle the exception as needed, or suppress if required
+                Console.WriteLine($"Error executing stored procedure \"{storedProcedureName}\" for ID {row["AccountId"]}: {ex.Message}");
             }
         }
     }
 
-
-    static void SendEmail(bool HasData, MailSettings mailSettings, int TrxDay, string attachmentFilePath = null)
+    static async Task SendEmailAsync(bool HasData, MailSettings mailSettings, int TrxDay, string attachmentFilePath = null)
     {
         try
         {
@@ -230,7 +197,7 @@ class Program
                     smtpClient.EnableSsl = true; // STARTTLS requires SSL
 
                     // Send the email
-                    smtpClient.Send(mail);
+                    await smtpClient.SendMailAsync(mail);
                     Console.WriteLine("Email sent successfully!");
                 }
             }
@@ -241,7 +208,6 @@ class Program
         }
     }
 }
-
 // Class for mail settings
 public class MailSettings
 {
