@@ -84,6 +84,8 @@ class Program
             for (int col = 0; col < dataTable.Columns.Count; col++)
             {
                 worksheet.Cell(1, col + 1).Value = dataTable.Columns[col].ColumnName;
+                worksheet.Cell(1, col + 1).Style.Font.FontName = "Roboto"; // Set font type
+                worksheet.Cell(1, col + 1).Style.Font.FontSize = 10;       // Set font size
             }
 
             // Add DataTable rows
@@ -91,8 +93,19 @@ class Program
             {
                 for (int col = 0; col < dataTable.Columns.Count; col++)
                 {
-                    worksheet.Cell(row + 2, col + 1).Value = dataTable.Rows[row][col]?.ToString();
+                    var cell = worksheet.Cell(row + 2, col + 1);
+                    cell.Value = dataTable.Rows[row][col]?.ToString();
+                    cell.Style.Font.FontName = "Roboto"; // Set font type
+                    cell.Style.Font.FontSize = 10;       // Set font size
                 }
+            }
+
+            // Apply borders to all cells with data
+            var range = worksheet.RangeUsed();
+            if (range != null)
+            {
+                range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
             }
 
             // Auto-fit columns for better readability
