@@ -22,7 +22,6 @@ class Program
             // Fetch configuration values
             string connectionString = config.GetConnectionString("DefaultConnection");
             string storedProcedureName1 = config["StoredProcedures:FindBadAccounts"];
-            string storedProcedureName2 = config["StoredProcedures:FixZeroBalanceAccountStatus"];
             var mailSettings = config.GetSection("EmailSettings").Get<MailSettings>();
             int TrxDay = Convert.ToInt32(config["TransactionDay"]);
 
