@@ -47,11 +47,6 @@ class Program
                 filteredResults.Rows.Add(newRow);
             }
 
-            if (filteredResults.Rows.Count > 0)
-            {
-                await CorrectStatusAsync(filteredResults, connectionString, storedProcedureName2);
-            }
-
             // Step 4: Check if there are any rows to export
             if (filteredResults.Rows.Count > 0)
             {
@@ -140,29 +135,6 @@ class Program
         }
 
         return dataTable;
-    }
-
-    static async Task CorrectStatusAsync(DataTable Ids, string connectionString, string storedProcedureName)
-    {
-        using SqlConnection connection = new SqlConnection(connectionString);
-        await connection.OpenAsync(); // Open the connection once to optimize performance
-
-        foreach (DataRow row in Ids.Rows)
-        {
-            using SqlCommand command = new SqlCommand(storedProcedureName, connection);
-            command.CommandType = CommandType.StoredProcedure;
-            command.Parameters.AddWithValue("@ClientCustomerAccountID", row["AccountId"]);
-
-            try
-            {
-                await command.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex)
-            {
-                // Log or handle the exception as needed, or suppress if required
-                Console.WriteLine($"Error executing stored procedure \"{storedProcedureName}\" for ID {row["AccountId"]}: {ex.Message}");
-            }
-        }
     }
 
     static async Task SendEmailAsync(bool HasData, MailSettings mailSettings, int TrxDay, string attachmentFilePath = null)
